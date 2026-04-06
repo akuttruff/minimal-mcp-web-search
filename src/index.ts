@@ -8,21 +8,47 @@ import {
 // --- Security: content sanitization ---
 
 function stripHtml(html: string): string {
+  // Remove <head> entirely (title, meta, inline CSS/JS bleed into text otherwise)
+  let text = html.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
+  // Remove HTML comments (can carry hidden prompt injection payloads)
+  text = text.replace(/<!--[\s\S]*?-->/g, "");
   // Remove script, style, noscript tags and their contents
-  let text = html.replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi, "");
-  // Remove all remaining HTML tags
-  text = text.replace(/<[^>]+>/g, " ");
-  // Decode common HTML entities
+  text = text.replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // Preserve heading hierarchy as markdown
+  text = text.replace(/<h1[^>]*>/gi, "\n# ").replace(/<\/h1>/gi, "\n");
+  text = text.replace(/<h2[^>]*>/gi, "\n## ").replace(/<\/h2>/gi, "\n");
+  text = text.replace(/<h3[^>]*>/gi, "\n### ").replace(/<\/h3>/gi, "\n");
+  text = text.replace(/<h[456][^>]*>/gi, "\n#### ").replace(/<\/h[456]>/gi, "\n");
+  // Preserve block structure as blank lines
+  text = text.replace(/<(p|div|section|article|header|footer|main|nav|aside|blockquote)[^>]*>/gi, "\n\n");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  // Preserve list items as markdown bullets
+  text = text.replace(/<li[^>]*>/gi, "\n- ");
+  // Remove all remaining tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode numeric HTML entities (decimal &#8220; and hex &#x201C;)
+  text = text.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 10)));
+  text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 16)));
+  // Decode named HTML entities
   text = text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
-  // Collapse whitespace
-  text = text.replace(/\s+/g, " ").trim();
-  return text;
+    .replace(/&nbsp;/g, " ")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&ldquo;/g, "\u201C")
+    .replace(/&rdquo;/g, "\u201D")
+    .replace(/&lsquo;/g, "\u2018")
+    .replace(/&rsquo;/g, "\u2019");
+  // Collapse excess blank lines, normalize inline whitespace
+  text = text.replace(/\n{3,}/g, "\n\n");
+  text = text.replace(/[^\S\n]+/g, " ");
+  return text.trim();
 }
 
 const MAX_CONTENT_LENGTH = 10_000;
