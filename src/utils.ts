@@ -1,3 +1,11 @@
+import {
+  DUCKDUCKGO_SEARCH_URL,
+  FETCH_TIMEOUT_MS,
+  MAX_CONTENT_LENGTH,
+  SEARCH_RESULTS_LIMIT,
+  USER_AGENT,
+} from "./constants.js";
+
 export function stripHtml(html: string): string {
   // Remove <head> entirely (title, meta, inline CSS/JS bleed into text otherwise)
   let text = html.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
@@ -42,11 +50,9 @@ export function stripHtml(html: string): string {
   return text.trim();
 }
 
-export const MAX_CONTENT_LENGTH = 10_000;
-
 export function truncate(text: string): string {
   if (text.length <= MAX_CONTENT_LENGTH) return text;
-  return text.slice(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated at 10,000 characters]";
+  return text.slice(0, MAX_CONTENT_LENGTH) + `\n\n[Content truncated at ${MAX_CONTENT_LENGTH.toLocaleString()} characters]`;
 }
 
 export function wrapAsData(toolName: string, content: string): string {
@@ -59,6 +65,42 @@ export function wrapAsData(toolName: string, content: string): string {
     `</content>`,
     `</tool_result>`,
   ].join("\n");
+}
+
+export async function webSearch(query: string): Promise<string> {
+  const url = `${DUCKDUCKGO_SEARCH_URL}?q=${encodeURIComponent(query)}`;
+
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+
+  if (!response.ok) {
+    return `Search failed with status ${response.status}`;
+  }
+
+  const html = await response.text();
+
+  const results: string[] = [];
+  const resultPattern =
+    /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+  let match: RegExpExecArray | null;
+  let count = 0;
+  while ((match = resultPattern.exec(html)) !== null && count < SEARCH_RESULTS_LIMIT) {
+    const resultUrl = decodeURIComponent(
+      match[1]?.replace(/.*uddg=([^&]*).*/, "$1") ?? match[1] ?? ""
+    );
+    const title = stripHtml(match[2] ?? "");
+    const snippet = stripHtml(match[3] ?? "");
+    results.push(`[${count + 1}] ${title}\n    URL: ${resultUrl}\n    ${snippet}`);
+    count++;
+  }
+
+  if (results.length === 0) {
+    return "No results found.";
+  }
+
+  return results.join("\n\n");
 }
 
 export async function fetchPage(url: string): Promise<string> {
@@ -75,8 +117,8 @@ export async function fetchPage(url: string): Promise<string> {
 
   try {
     const response = await fetch(url, {
-      headers: { "User-Agent": "MinimalMCP/1.0" },
-      signal: AbortSignal.timeout(10_000),
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       redirect: "follow",
     });
 
@@ -94,7 +136,7 @@ export async function fetchPage(url: string): Promise<string> {
     return truncate(text);
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
-      return "Request timed out after 10 seconds.";
+      return `Request timed out after ${FETCH_TIMEOUT_MS / 1_000} seconds.`;
     }
     return `Fetch error: ${error instanceof Error ? error.message : String(error)}`;
   }

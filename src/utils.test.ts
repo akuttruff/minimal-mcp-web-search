@@ -1,6 +1,7 @@
 import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { stripHtml, truncate, wrapAsData, fetchPage, MAX_CONTENT_LENGTH } from "./utils.js";
+import { stripHtml, truncate, wrapAsData, fetchPage } from "./utils.js";
+import { FETCH_TIMEOUT_MS, MAX_CONTENT_LENGTH } from "./constants.js";
 
 // --- stripHtml ---
 
@@ -135,7 +136,7 @@ describe("truncate", () => {
     const long = "a".repeat(MAX_CONTENT_LENGTH + 100);
     const result = truncate(long);
     assert.ok(result.length < long.length);
-    assert.ok(result.endsWith("[Content truncated at 10,000 characters]"));
+    assert.ok(result.endsWith(`[Content truncated at ${MAX_CONTENT_LENGTH.toLocaleString()} characters]`));
   });
 
   it("truncates at exactly MAX_CONTENT_LENGTH characters before the message", () => {
@@ -221,7 +222,7 @@ describe("fetchPage", () => {
       error.name = "TimeoutError";
       throw error;
     });
-    assert.equal(await fetchPage("https://example.com"), "Request timed out after 10 seconds.");
+    assert.equal(await fetchPage("https://example.com"), `Request timed out after ${FETCH_TIMEOUT_MS / 1_000} seconds.`);
   });
 
   it("returns a fetch error for network failures", async () => {

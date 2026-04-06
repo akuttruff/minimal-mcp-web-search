@@ -4,88 +4,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { fetchPage, stripHtml, wrapAsData } from "./utils.js";
-
-// --- Tool definitions (raw JSON Schema, no zod) ---
-
-const TOOLS = [
-  {
-    name: "web_search",
-    description:
-      "Search the web using DuckDuckGo. Returns a list of result titles, URLs, and snippets. Use this when you need current information.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "fetch_page",
-    description:
-      "Fetch the text content of a web page. Returns plain text with HTML stripped. Use this to read the full content of a URL from search results.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        url: {
-          type: "string",
-          description: "URL to fetch",
-        },
-      },
-      required: ["url"],
-    },
-  },
-];
-
-// --- Tool implementations ---
-
-async function webSearch(query: string): Promise<string> {
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "MinimalMCP/1.0",
-    },
-  });
-
-  if (!response.ok) {
-    return `Search failed with status ${response.status}`;
-  }
-
-  const html = await response.text();
-
-  // Parse DuckDuckGo HTML results
-  const results: string[] = [];
-  const resultPattern =
-    /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
-
-  let match: RegExpExecArray | null;
-  let count = 0;
-  while ((match = resultPattern.exec(html)) !== null && count < 5) {
-    const resultUrl = decodeURIComponent(
-      match[1]?.replace(/.*uddg=([^&]*).*/, "$1") ?? match[1] ?? ""
-    );
-    const title = stripHtml(match[2] ?? "");
-    const snippet = stripHtml(match[3] ?? "");
-    results.push(`[${count + 1}] ${title}\n    URL: ${resultUrl}\n    ${snippet}`);
-    count++;
-  }
-
-  if (results.length === 0) {
-    return "No results found.";
-  }
-
-  return results.join("\n\n");
-}
+import { fetchPage, webSearch, wrapAsData } from "./utils.js";
+import { SERVER_NAME, SERVER_VERSION, TOOLS } from "./constants.js";
 
 // --- Server setup ---
 
 const server = new Server(
-  { name: "minimal-mcp-web-search", version: "1.0.0" },
+  { name: SERVER_NAME, version: SERVER_VERSION },
   { capabilities: { tools: {} } }
 );
 
