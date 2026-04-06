@@ -1,6 +1,6 @@
 # minimal-mcp-web-search
 
-A minimal [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server in TypeScript that gives local LLMs web access through two tools: `web_search` and `fetch_page`. Built for [LM Studio](https://lmstudio.ai), uses [DuckDuckGo](https://duckduckgo.com) for search, no API keys required.
+An exercise in building an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) web search server in TypeScript with [OWASP security for LLM applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/) as a first priority. Gives local LLMs web access through two tools — `web_search` and `fetch_page` — using [DuckDuckGo](https://duckduckgo.com) for search. Built for [LM Studio](https://lmstudio.ai), no API keys required.
 
 ## Tools
 
